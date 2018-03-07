@@ -12,6 +12,10 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+const (
+	BlipCBMobileReplication = "CBMobile_2"
+)
+
 // subChangesCmd represents the subChanges command
 var subChangesCmd = &cobra.Command{
 	Use:   "subChanges [sync gateway url]",
@@ -42,8 +46,8 @@ func subChangesRun(cmd *cobra.Command, args []string) {
 	u.Scheme = "ws"
 
 	// Make BLIP/Websocket connection
-	blipContext := blip.NewContext()
-	blipContext.Logger = func(fmt string, params ...interface{}) {
+	blipContext := blip.NewContext(BlipCBMobileReplication)
+	blipContext.Logger = func(eventType blip.LogEventType, fmt string, params ...interface{}) {
 		log.Printf(fmt, params...)
 	}
 	// blipContext.LogMessages = true
@@ -90,6 +94,9 @@ func subChangesRun(cmd *cobra.Command, args []string) {
 			}
 			response.SetBody(emptyResponseValBytes)
 		}
+
+		// request.Sender.CloseAbruptly()
+		request.Sender.Close()
 
 	}
 
