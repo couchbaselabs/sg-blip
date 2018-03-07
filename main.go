@@ -1,6 +1,6 @@
 package main
 
-import "github.com/tleyden/sg-blip/cmd"
+import "github.com/couchbaselabs/sg-blip/cmd"
 
 func main() {
 	cmd.Execute()
