@@ -5,15 +5,9 @@ import (
 
 	"encoding/json"
 	"log"
-	"net/url"
 
 	"github.com/couchbase/go-blip"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/websocket"
-)
-
-const (
-	BlipCBMobileReplication = "CBMobile_2"
 )
 
 // subChangesCmd represents the subChanges command
@@ -37,44 +31,14 @@ func subChangesRun(cmd *cobra.Command, args []string) {
 
 	serverUrl := args[0]
 
-	// Construct URL to connect to blipsync target endpoint
-	destUrl := fmt.Sprintf("%s/_blipsync", serverUrl)
-	u, err := url.Parse(destUrl)
+	sgBlipContext, err := NewSgBlipContext(serverUrl)
 	if err != nil {
-		panic(fmt.Errorf("Error parsing url: %v", destUrl))
+		panic(fmt.Sprintf("Error creeating sgblip context: %v", err))
 	}
-	u.Scheme = "ws"
-
-	// Make BLIP/Websocket connection
-	blipContext := blip.NewContext(BlipCBMobileReplication)
-	blipContext.Logger = func(eventType blip.LogEventType, fmt string, params ...interface{}) {
-		log.Printf(fmt, params...)
-	}
-	// blipContext.LogMessages = true
-	// blipContext.LogFrames = true
-
-	origin := "http://localhost" // TODO: what should be used here?
-
-	config, err := websocket.NewConfig(u.String(), origin)
-	if err != nil {
-		panic(fmt.Errorf("Error creating websocket config.  Error: %v", err))
-
-	}
-
-	// TODO -- take username and param
-	//if len(spec.connectingUsername) > 0 {
-	//	config.Header = http.Header{
-	//		"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte(spec.connectingUsername+":"+spec.connectingPassword))},
-	//	}
-	//}
-
-	sender, err := blipContext.DialConfig(config)
-	if err != nil {
-		panic(fmt.Errorf("Error connecting to Sync Gateway.  Error: %v", err))
-	}
+	defer sgBlipContext.BlipSender.Close()
 
 	// When this test sends subChanges, Sync Gateway will send a changes request that must be handled
-	blipContext.HandlerForProfile["changes"] = func(request *blip.Message) {
+	sgBlipContext.BlipContext.HandlerForProfile["changes"] = func(request *blip.Message) {
 
 		requestBody, err := request.Body()
 		if err != nil {
@@ -109,8 +73,10 @@ func subChangesRun(cmd *cobra.Command, args []string) {
 	default:
 		subChangesRequest.Properties["continuous"] = "false"
 	}
+	subChangesRequest.Properties["foo"] = "bar"
+	subChangesRequest.SetCompressed(false)
 
-	sent := sender.Send(subChangesRequest)
+	sent := sgBlipContext.BlipSender.Send(subChangesRequest)
 	if !sent {
 		panic(fmt.Sprintf("Unable to subscribe to changes."))
 	}
